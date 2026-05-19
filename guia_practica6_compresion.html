@@ -1,0 +1,1635 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Práctica 6 — Compresión de Audio e Imágenes en MATLAB</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060a0f;
+    --surface: #0d1520;
+    --surface2: #121d2e;
+    --border: #1e3050;
+    --text: #c8d8ec;
+    --muted: #4a6280;
+    --audio: #00e5a0;
+    --audio-dim: #00704e;
+    --img: #ff6b6b;
+    --img-dim: #8b2020;
+    --accent: #4da6ff;
+    --accent-dim: #1a4a80;
+    --yellow: #ffd166;
+    --purple: #c77dff;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── GRID BG ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(77,166,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(77,166,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    background: rgba(6,10,15,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    height: 56px;
+  }
+
+  .nav-logo {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .nav-logo span { color: var(--audio); }
+
+  .nav-tabs {
+    display: flex;
+    gap: 4px;
+  }
+
+  .nav-tab {
+    background: none;
+    border: none;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 6px 14px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+
+  .nav-tab:hover { color: var(--text); background: var(--surface); }
+  .nav-tab.active { color: var(--bg); background: var(--accent); }
+
+  /* ── SLIDES ── */
+  .slides-wrap {
+    padding-top: 56px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .slide {
+    display: none;
+    min-height: calc(100vh - 56px);
+    padding: 48px 32px 80px;
+    max-width: 1100px;
+    margin: 0 auto;
+    animation: fadeIn 0.4s ease;
+  }
+
+  .slide.active { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── TYPOGRAPHY ── */
+  .slide-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  h1 { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 800; line-height: 1.1; margin-bottom: 16px; }
+  h2 { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 800; margin-bottom: 20px; }
+  h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 12px; }
+
+  p { font-size: 0.95rem; line-height: 1.75; color: var(--text); margin-bottom: 14px; }
+
+  .hl-audio { color: var(--audio); }
+  .hl-img   { color: var(--img); }
+  .hl-acc   { color: var(--accent); }
+  .hl-yel   { color: var(--yellow); }
+  .hl-pur   { color: var(--purple); }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .card-audio { border-color: var(--audio-dim); background: rgba(0,229,160,0.04); }
+  .card-img   { border-color: var(--img-dim);   background: rgba(255,107,107,0.04); }
+  .card-info  { border-color: var(--accent-dim); background: rgba(77,166,255,0.04); }
+
+  /* ── GRID LAYOUTS ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media(max-width:700px){ .grid-2,.grid-3{ grid-template-columns:1fr; } }
+
+  /* ── CODE ── */
+  .code-block {
+    background: #080e17;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.8;
+    overflow-x: auto;
+    position: relative;
+    margin-bottom: 16px;
+  }
+
+  .code-label {
+    position: absolute;
+    top: 10px; right: 14px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .c-kw  { color: #ff7b93; }
+  .c-fn  { color: #79dcaa; }
+  .c-str { color: #ffd700; }
+  .c-cmt { color: #4a6280; font-style: italic; }
+  .c-num { color: #f78c6c; }
+  .c-var { color: #82aaff; }
+
+  /* ── STEP LIST ── */
+  .step-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+
+  .step-list li {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 14px 18px;
+    background: var(--surface2);
+    border-radius: 10px;
+    border-left: 3px solid var(--border);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    transition: border-color 0.2s;
+  }
+
+  .step-list li:hover { border-left-color: var(--accent); }
+
+  .step-num {
+    min-width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .step-audio .step-num { background: var(--audio-dim); color: var(--audio); }
+  .step-img .step-num   { background: var(--img-dim);   color: var(--img); }
+
+  /* ── TABLE ── */
+  .qtable {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 11px;
+    margin-top: 10px;
+  }
+
+  .qtable td {
+    border: 1px solid var(--border);
+    padding: 5px 7px;
+    text-align: center;
+    transition: background 0.15s;
+    cursor: default;
+  }
+
+  .qtable td:hover { background: rgba(77,166,255,0.15); color: white; }
+  .qtable-high { background: rgba(255,107,107,0.18); color: var(--img); }
+  .qtable-med  { background: rgba(255,209,102,0.1);  color: var(--yellow); }
+  .qtable-low  { background: rgba(0,229,160,0.1);    color: var(--audio); }
+
+  /* ── CANVAS ── */
+  canvas {
+    border-radius: 10px;
+    display: block;
+    image-rendering: pixelated;
+  }
+
+  /* ── CONTROLS ── */
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  .ctrl-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 130px;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    outline: none;
+    min-width: 100px;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 8px rgba(77,166,255,0.5);
+  }
+
+  .range-audio::-webkit-slider-thumb { background: var(--audio); box-shadow: 0 0 8px rgba(0,229,160,0.5); }
+  .range-img::-webkit-slider-thumb   { background: var(--img);   box-shadow: 0 0 8px rgba(255,107,107,0.5); }
+
+  .val-badge {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 48px;
+    text-align: right;
+  }
+
+  /* ── BTN ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 20px;
+    border-radius: 8px;
+    border: none;
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+
+  .btn-audio { background: var(--audio); color: #001a0f; }
+  .btn-audio:hover { background: #00ffb3; transform: translateY(-1px); }
+  .btn-img   { background: var(--img); color: #1a0000; }
+  .btn-img:hover { background: #ff9090; transform: translateY(-1px); }
+  .btn-acc   { background: var(--accent); color: #001020; }
+  .btn-acc:hover { background: #7dc2ff; transform: translateY(-1px); }
+  .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── FUNC CARDS ── */
+  .func-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 14px; margin-bottom: 20px; }
+
+  .func-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .func-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .func-card.selected { border-color: var(--accent); background: rgba(77,166,255,0.08); }
+
+  .func-name {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--audio);
+    margin-bottom: 6px;
+  }
+
+  .func-card.img-func .func-name { color: var(--img); }
+  .func-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+  .func-detail {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .func-detail.open { display: block; }
+
+  /* ── METRICS ── */
+  .metric-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+
+  .metric {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .metric-val {
+    font-family: var(--mono);
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .metric-lbl { font-size: 11px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+
+  /* ── HERO SLIDE ── */
+  .hero-title {
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    font-weight: 800;
+    line-height: 1.05;
+    margin-bottom: 10px;
+  }
+
+  .hero-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    padding: 5px 12px;
+    border-radius: 4px;
+    margin-bottom: 28px;
+    text-transform: uppercase;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    margin: 4px;
+  }
+
+  .pill-audio { background: rgba(0,229,160,0.12); color: var(--audio); border: 1px solid var(--audio-dim); }
+  .pill-img   { background: rgba(255,107,107,0.12); color: var(--img); border: 1px solid var(--img-dim); }
+
+  /* ── DCT VIS ── */
+  #dctCanvas { cursor: crosshair; }
+
+  /* ── COMPRESSION VIS ── */
+  .comp-bars { display: flex; gap: 0; height: 180px; align-items: flex-end; margin-top: 12px; }
+  .comp-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .comp-bar { width: 70%; border-radius: 4px 4px 0 0; transition: height 0.5s cubic-bezier(.34,1.56,.64,1); }
+
+  /* ── NAV ARROWS ── */
+  .slide-nav {
+    position: fixed;
+    bottom: 24px;
+    right: 28px;
+    display: flex;
+    gap: 8px;
+    z-index: 100;
+  }
+
+  .snav-btn {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: rgba(6,10,15,0.9);
+    color: var(--text);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    backdrop-filter: blur(8px);
+  }
+
+  .snav-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── TOOLTIP ── */
+  .tip {
+    display: inline-block;
+    position: relative;
+    border-bottom: 1px dashed var(--muted);
+    cursor: help;
+  }
+
+  .tip::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--text);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 200;
+    font-family: var(--mono);
+  }
+
+  .tip:hover::after { opacity: 1; }
+
+  /* FORMULA */
+  .formula {
+    background: #080e17;
+    border-left: 3px solid var(--accent);
+    border-radius: 0 10px 10px 0;
+    padding: 14px 20px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--yellow);
+    margin: 12px 0;
+    overflow-x: auto;
+  }
+
+  /* WARN BOX */
+  .note-box {
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 0.88rem;
+    line-height: 1.65;
+    margin-bottom: 16px;
+    border-left: 3px solid;
+  }
+
+  .note-info { background: rgba(77,166,255,0.08); border-color: var(--accent); }
+  .note-warn { background: rgba(255,209,102,0.08); border-color: var(--yellow); color: var(--yellow); }
+  .note-ok   { background: rgba(0,229,160,0.08);   border-color: var(--audio); }
+
+  /* SEPARATOR */
+  .sep { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+
+  /* PROGRESS */
+  #progress-bar {
+    position: fixed;
+    top: 56px; left: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--audio), var(--accent), var(--img));
+    transition: width 0.4s ease;
+    z-index: 99;
+  }
+</style>
+</head>
+<body>
+
+<div id="progress-bar"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">TSRT · <span>Práctica 6</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="goTo(0)">Intro</button>
+    <button class="nav-tab" onclick="goTo(1)">🎵 Audio</button>
+    <button class="nav-tab" onclick="goTo(2)">Funciones Audio</button>
+    <button class="nav-tab" onclick="goTo(3)">Código Audio</button>
+    <button class="nav-tab" onclick="goTo(4)">🖼 Imagen</button>
+    <button class="nav-tab" onclick="goTo(5)">DCT Interactiva</button>
+    <button class="nav-tab" onclick="goTo(6)">Código Imagen</button>
+    <button class="nav-tab" onclick="goTo(7)">Compresión</button>
+  </div>
+</nav>
+
+<div class="slides-wrap">
+
+<!-- ════════════════════════════════════════════
+     SLIDE 0 — INTRO
+════════════════════════════════════════════ -->
+<div class="slide active" id="slide-0">
+  <div class="slide-tag">EPN · ESFOT · Práctica 6 · 2024</div>
+  <div class="hero-title">Compresión de<br><span class="hl-audio">Audio</span> e<br><span class="hl-img">Imágenes</span> en MATLAB</div>
+  <div class="hero-badge" style="background:rgba(77,166,255,0.1);border:1px solid var(--accent-dim);color:var(--accent);">ING. CRISTIAN ZÚÑIGA · CÓDIGO TRTD323L · GR1</div>
+
+  <p>En esta práctica se trabajan <strong>dos grandes áreas de la compresión de señales</strong>: reducción de datos en audio digital mediante submuestreo, y compresión de imágenes estáticas con la Transformada Coseno Discreta (DCT) — el corazón del estándar JPEG.</p>
+
+  <div class="grid-2" style="margin-top:24px;">
+    <div class="card card-audio">
+      <h3 class="hl-audio">🎵 Parte 1 — Compresión de Audio</h3>
+      <p style="font-size:0.88rem;">Se carga el archivo <code>bearsound.wav</code>, se analiza su espectro, y se aplica <strong>downsampling</strong> para reducir la tasa de muestreo. Se calcula la relación de compresión resultante.</p>
+      <div style="margin-top:10px;">
+        <span class="pill pill-audio">audioread</span>
+        <span class="pill pill-audio">downsample</span>
+        <span class="pill pill-audio">audiowrite</span>
+        <span class="pill pill-audio">audioinfo</span>
+      </div>
+    </div>
+    <div class="card card-img">
+      <h3 class="hl-img">🖼 Parte 2 — Compresión de Imagen</h3>
+      <p style="font-size:0.88rem;">Se convierte una imagen a escala de grises, se aplica la DCT 2D por bloques de 8×8, se cuantifica con la tabla JPEG, y se reconstruye la imagen comparando calidad vs. compresión.</p>
+      <div style="margin-top:10px;">
+        <span class="pill pill-img">im2gray</span>
+        <span class="pill pill-img">dct2 / idct2</span>
+        <span class="pill pill-img">imwrite</span>
+        <span class="pill pill-img">montage</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-info" style="margin-top:8px;">
+    <h3 class="hl-acc">¿Por qué comprimimos señales?</h3>
+    <p style="font-size:0.88rem;">Un archivo de audio sin comprimir de solo 3 minutos ocupa ~30 MB (CD-quality). Una imagen de 12 MP sin comprimir pesa ~35 MB. La compresión elimina <strong>redundancia</strong> e <strong>información imperceptible</strong> para reducir dramáticamente ese peso sin pérdida de calidad apreciable.</p>
+  </div>
+
+  <!-- LIVE WAVEFORM HERO -->
+  <canvas id="heroWave" width="1020" height="80" style="width:100%;margin-top:8px;border-radius:8px;border:1px solid var(--border);"></canvas>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SLIDE 1 — COMPRESIÓN DE AUDIO (TEORÍA)
+════════════════════════════════════════════ -->
+<div class="slide" id="slide-1">
+  <div class="slide-tag">Parte 1 · Teoría</div>
+  <h2>Compresión de <span class="hl-audio">Audio</span> — Downsampling</h2>
+
+  <div class="note-box note-info">
+    <strong>¿Qué es el downsampling?</strong> Es la técnica de reducir la frecuencia de muestreo de una señal tomando solo cada N-ésima muestra. Si tomamos 1 de cada 2 muestras, la nueva tasa es la mitad. Esto reduce directamente el tamaño del archivo.
+  </div>
+
+  <!-- INTERACTIVE WAVEFORM DEMO -->
+  <div class="card">
+    <h3>Simulación interactiva — Efecto del Downsampling</h3>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Factor N (tomar 1 de N)</span>
+      <input type="range" id="dsSlider" min="1" max="8" value="1" class="range-audio">
+      <span class="val-badge hl-audio" id="dsVal">1×</span>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Frecuencia señal (Hz)</span>
+      <input type="range" id="freqSlider" min="1" max="20" value="5" class="range-audio">
+      <span class="val-badge hl-audio" id="freqVal">5 Hz</span>
+    </div>
+    <canvas id="dsCanvas" width="900" height="200" style="width:100%;border:1px solid var(--border);"></canvas>
+    <div style="margin-top:10px;display:flex;gap:20px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--muted);">
+      <span><span style="color:var(--audio);">■</span> Señal original</span>
+      <span><span style="color:var(--img);">■</span> Muestras elegidas (1/N)</span>
+      <span><span style="color:var(--yellow);">■</span> Señal reconstruida</span>
+    </div>
+    <div id="dsWarning" class="note-box note-warn" style="margin-top:12px;display:none;">
+      ⚠️ <strong>¡ALIASING DETECTADO!</strong> El factor de downsampling es demasiado alto para esta frecuencia. La señal reconstruida es distorsionada (regla de Nyquist: fs/N ≥ 2·f_señal).
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card card-audio">
+      <h3 class="hl-audio">Antes del downsampling</h3>
+      <ul class="step-list">
+        <li class="step-audio"><div class="step-num">fs</div><div>Frecuencia de muestreo original: <strong>típicamente 44,100 Hz</strong> (calidad CD)</div></li>
+        <li class="step-audio"><div class="step-num">N</div><div>Número de muestras totales: grande, archivos pesados</div></li>
+        <li class="step-audio"><div class="step-num">B</div><div>Bits por muestra: 16 bits (rango -32768 a +32767)</div></li>
+      </ul>
+    </div>
+    <div class="card card-audio">
+      <h3 class="hl-audio">Después del downsampling (N=4)</h3>
+      <ul class="step-list">
+        <li class="step-audio"><div class="step-num">fs</div><div>Nueva frecuencia: <strong>44,100 / 4 ≈ 11,025 Hz</strong></div></li>
+        <li class="step-audio"><div class="step-num">N</div><div>Número de muestras: reducido 4×</div></li>
+        <li class="step-audio"><div class="step-num">B</div><div>Bits por muestra: 8 bits → otra reducción adicional</div></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="formula">
+    Relación de Compresión = (fs_original × bits_original) / (fs_nueva × bits_nuevos)<br>
+    RC = (44100 × 16) / (11025 × 8) = 705,600 / 88,200 = <span class="hl-audio">8:1</span>
+  </div>
+
+  <div class="note-box note-ok">
+    <strong>Condición de Nyquist:</strong> Para que el downsampling sea válido sin aliasing, la nueva frecuencia de muestreo debe ser ≥ 2 veces la frecuencia máxima del audio. Si el audio tiene componentes hasta 5,000 Hz, fs_nueva ≥ 10,000 Hz.
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SLIDE 2 — FUNCIONES MATLAB AUDIO
+════════════════════════════════════════════ -->
+<div class="slide" id="slide-2">
+  <div class="slide-tag">Parte 1 · Funciones MATLAB</div>
+  <h2>Funciones MATLAB — <span class="hl-audio">Audio</span></h2>
+  <p>Haz clic en cada función para ver su descripción, sintaxis y un ejemplo.</p>
+
+  <div class="func-grid" id="audioFuncGrid">
+    <div class="func-card" onclick="showFunc('audioread')">
+      <div class="func-name">audioread()</div>
+      <div class="func-desc">Lee un archivo de audio y retorna muestras y fs</div>
+    </div>
+    <div class="func-card" onclick="showFunc('audioinfo')">
+      <div class="func-name">audioinfo()</div>
+      <div class="func-desc">Devuelve metadatos del archivo de audio</div>
+    </div>
+    <div class="func-card" onclick="showFunc('downsample')">
+      <div class="func-name">downsample()</div>
+      <div class="func-desc">Submuestrea una señal por factor N</div>
+    </div>
+    <div class="func-card" onclick="showFunc('audiowrite')">
+      <div class="func-name">audiowrite()</div>
+      <div class="func-desc">Escribe un archivo de audio .wav/.mp3</div>
+    </div>
+    <div class="func-card" onclick="showFunc('floor')">
+      <div class="func-name">floor()</div>
+      <div class="func-desc">Redondea hacia abajo (usado para calcular N)</div>
+    </div>
+    <div class="func-card" onclick="showFunc('fft-audio')">
+      <div class="func-name">fft() / fftshift()</div>
+      <div class="func-desc">Transforma al dominio frecuencia para plotear espectro</div>
+    </div>
+  </div>
+
+  <div class="func-detail" id="fd-audioread">
+    <h3 class="hl-audio">audioread(filename)</h3>
+    <p>Lee un archivo de audio (WAV, MP3, FLAC, OGG). Retorna la matriz de muestras <code>y</code> (columnas = canales) y la frecuencia de muestreo <code>fs</code> en Hz.</p>
+    <div class="code-block">
+      <span class="code-label">MATLAB</span>
+      <span class="c-cmt">% Leer archivo completo</span><br>
+      [<span class="c-var">y</span>, <span class="c-var">fs</span>] = <span class="c-fn">audioread</span>(<span class="c-str">'bearsound.wav'</span>);<br>
+      <br>
+      <span class="c-cmt">% Leer solo un rango de muestras</span><br>
+      [<span class="c-var">y</span>, <span class="c-var">fs</span>] = <span class="c-fn">audioread</span>(<span class="c-str">'bearsound.wav'</span>, [<span class="c-num">1</span>, <span class="c-num">200</span>]);<br>
+      <br>
+      <span class="c-cmt">% y: matriz [N_muestras x N_canales], valores en [-1, 1]</span><br>
+      <span class="c-cmt">% fs: frecuencia de muestreo en Hz (ej: 44100)</span>
+    </div>
+    <div class="note-box note-info">Los valores de audio están normalizados entre -1 y +1, no en voltios reales.</div>
+  </div>
+
+  <div class="func-detail" id="fd-audioinfo">
+    <h3 class="hl-audio">audioinfo(filename)</h3>
+    <p>Retorna una <em>estructura</em> con metadatos del archivo sin leer las muestras. Útil para verificar antes de cargar archivos grandes.</p>
+    <div class="code-block">
+      <span class="code-label">MATLAB</span>
+      <span class="c-var">info</span> = <span class="c-fn">audioinfo</span>(<span class="c-str">'bearsound.wav'</span>);<br>
+      <br>
+      <span class="c-fn">disp</span>(<span class="c-var">info</span>.SampleRate)    <span class="c-cmt">% → 44100 Hz</span><br>
+      <span class="c-fn">disp</span>(<span class="c-var">info</span>.NumChannels)   <span class="c-cmt">% → 1 (mono) o 2 (stereo)</span><br>
+      <span class="c-fn">disp</span>(<span class="c-var">info</span>.TotalSamples)  <span class="c-cmt">% → número total de muestras</span><br>
+      <span class="c-fn">disp</span>(<span class="c-var">info</span>.Duration)     <span class="c-cmt">% → duración en segundos</span><br>
+      <span class="c-fn">disp</span>(<span class="c-var">info</span>.BitsPerSample) <span class="c-cmt">% → 16 (típico)</span>
+    </div>
+  </div>
+
+  <div class="func-detail" id="fd-downsample">
+    <h3 class="hl-audio">downsample(x, N)</h3>
+    <p>Retiene solo 1 de cada N muestras. <strong>No aplica filtro anti-aliasing</strong> por defecto — si hay frecuencias altas, se produce aliasing. Para señales de audio reales, es común aplicar un filtro pasa-bajas antes.</p>
+    <div class="code-block">
+      <span class="code-label">MATLAB</span>
+      <span class="c-cmt">% Factor de downsampling</span><br>
+      <span class="c-var">N</span> = <span class="c-fn">floor</span>(<span class="c-num">44100</span> / <span class="c-num">11025</span>);  <span class="c-cmt">% = 4</span><br>
+      <br>
+      <span class="c-cmt">% Submuestrear el vector de audio</span><br>
+      <span class="c-var">y_down</span> = <span class="c-fn">downsample</span>(<span class="c-var">y</span>, <span class="c-var">N</span>);<br>
+      <br>
+      <span class="c-cmt">% Nueva tasa de muestreo</span><br>
+      <span class="c-var">fs_new</span> = <span class="c-var">fs</span> / <span class="c-var">N</span>;  <span class="c-cmt">% = 11025 Hz</span><br>
+      <br>
+      <span class="c-cmt">% Verificar tamaños</span><br>
+      <span class="c-fn">fprintf</span>(<span class="c-str">'Original: %d muestras → Nuevo: %d muestras\n'</span>, <span class="c-fn">length</span>(<span class="c-var">y</span>), <span class="c-fn">length</span>(<span class="c-var">y_down</span>));
+    </div>
+  </div>
+
+  <div class="func-detail" id="fd-audiowrite">
+    <h3 class="hl-audio">audiowrite(filename, y, fs)</h3>
+    <p>Escribe un archivo de audio. Se puede especificar <code>BitsPerSample</code> para reducir aún más el tamaño.</p>
+    <div class="code-block">
+      <span class="code-label">MATLAB</span>
+      <span class="c-cmt">% Guardar en 16 bits (default)</span><br>
+      <span class="c-fn">audiowrite</span>(<span class="c-str">'audio_comprimido.wav'</span>, <span class="c-var">y_down</span>, <span class="c-var">fs_new</span>);<br>
+      <br>
+      <span class="c-cmt">% Guardar en 8 bits (mayor compresión)</span><br>
+      <span class="c-fn">audiowrite</span>(<span class="c-str">'audio_8bit.wav'</span>, <span class="c-var">y_down</span>, <span class="c-var">fs_new</span>, ...<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<span class="c-str">'BitsPerSample'</span>, <span class="c-num">8</span>);<br>
+      <br>
+      <span class="c-cmt">% y debe estar en rango [-1, 1]</span>
+    </div>
+  </div>
+
+  <div class="func-detail" id="fd-floor">
+    <h3 class="hl-audio">floor(x)</h3>
+    <p>Redondea hacia el entero inferior. En esta práctica se usa para calcular el factor de downsampling de forma exacta.</p>
+    <div class="code-block">
+      <span class="code-label">MATLAB</span>
+      <span class="c-fn">floor</span>(<span class="c-num">3.9</span>)   <span class="c-cmt">% → 3</span><br>
+      <span class="c-fn">floor</span>(<span class="c-num">44100</span>/<span class="c-num">11025</span>) <span class="c-cmt">% → 4 (factor N)</span><br>
+      <span class="c-fn">floor</span>(-<span class="c-num">1.2</span>)  <span class="c-cmt">% → -2 (hacia abajo)</span>
+    </div>
+  </div>
+
+  <div class="func-detail" id="fd-fft-audio">
+    <h3 class="hl-audio">fft() y fftshift() — Espectro de audio</h3>
+    <p>Se usa para visualizar qué frecuencias contiene el audio.</p>
+    <div class="code-block">
+      <span class="code-label">MATLAB</span>
+      <span class="c-var">N_muestras</span> = <span class="c-fn">length</span>(<span class="c-var">y</span>);<br>
+      <span class="c-var">Y</span> = <span class="c-fn">fft</span>(<span class="c-var">y</span>);                        <span class="c-cmt">% FFT</span><br>
+      <span class="c-var">Y_mag</span> = <span class="c-fn">abs</span>(<span class="c-fn">fftshift</span>(<span class="c-var">Y</span>));          <span class="c-cmt">% Magnitud centrada</span><br>
+      <span class="c-var">f</span> = <span class="c-fn">linspace</span>(-<span class="c-var">fs</span>/<span class="c-num">2</span>, <span class="c-var">fs</span>/<span class="c-num">2</span>, <span class="c-var">N_muestras</span>); <span class="c-cmt">% Eje frecuencia</span><br>
+      <br>
+      <span class="c-fn">plot</span>(<span class="c-var">f</span>, <span class="c-var">Y_mag</span>);<br>
+      <span class="c-fn">xlabel</span>(<span class="c-str">'Frecuencia (Hz)'</span>);<br>
+      <span class="c-fn">ylabel</span>(<span class="c-str">'Magnitud'</span>);
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SLIDE 3 — CÓDIGO COMPLETO AUDIO
+════════════════════════════════════════════ -->
+<div class="slide" id="slide-3">
+  <div class="slide-tag">Parte 1 · Código MATLAB completo</div>
+  <h2>Código Completo — <span class="hl-audio">Compresión de Audio</span></h2>
+
+  <ul class="step-list" style="margin-bottom:20px;">
+    <li class="step-audio"><div class="step-num">5.1</div><div>Importar el archivo <code>bearsound.wav</code> al workspace de MATLAB (mismo directorio o en path)</div></li>
+    <li class="step-audio"><div class="step-num">5.2</div><div>Leer el vector de audio y la frecuencia de muestreo con <code>audioread</code></div></li>
+    <li class="step-audio"><div class="step-num">5.3</div><div>Ver metadatos del archivo con <code>audioinfo</code></div></li>
+    <li class="step-audio"><div class="step-num">5.4</div><div>Graficar las 200 primeras muestras y los dos primeros segundos en una figura</div></li>
+    <li class="step-audio"><div class="step-num">5.5</div><div>Calcular y plotear el espectro de frecuencias de la señal original</div></li>
+    <li class="step-audio"><div class="step-num">5.6</div><div>Calcular factor N con <code>floor</code> y aplicar <code>downsample</code></div></li>
+    <li class="step-audio"><div class="step-num">5.7</div><div>Graficar los dos primeros segundos y el espectro de la señal submuestreada</div></li>
+    <li class="step-audio"><div class="step-num">5.8</div><div>Guardar la señal submuestreada como WAV de 8 bits con <code>audiowrite</code></div></li>
+    <li class="step-audio"><div class="step-num">5.9</div><div>Calcular la relación de compresión</div></li>
+  </ul>
+
+  <div class="code-block">
+    <span class="code-label">MATLAB · practica6_audio.m</span>
+    <span class="c-cmt">%% ── PRÁCTICA 6: COMPRESIÓN DE AUDIO ──────────────────────────────</span><br>
+    <span class="c-fn">clc</span>; <span class="c-fn">clear</span>; <span class="c-fn">close</span> all;<br>
+    <br>
+    <span class="c-cmt">%% 5.1 Importar archivo de audio</span><br>
+    <span class="c-var">filename</span> = <span class="c-str">'bearsound.wav'</span>;<br>
+    <br>
+    <span class="c-cmt">%% 5.2 Leer vector de audio y frecuencia de muestreo</span><br>
+    [<span class="c-var">y</span>, <span class="c-var">fs</span>] = <span class="c-fn">audioread</span>(<span class="c-var">filename</span>);<br>
+    <br>
+    <span class="c-cmt">%% 5.3 Información del archivo de audio</span><br>
+    <span class="c-var">info</span> = <span class="c-fn">audioinfo</span>(<span class="c-var">filename</span>);<br>
+    <span class="c-fn">disp</span>(<span class="c-var">info</span>);<br>
+    <br>
+    <span class="c-cmt">%% 5.4 Figura 1: 200 primeras muestras + primeros 2 segundos</span><br>
+    <span class="c-var">muestras_2s</span> = <span class="c-num">2</span> * <span class="c-var">fs</span>;          <span class="c-cmt">% nº de muestras en 2 segundos</span><br>
+    <span class="c-var">t</span> = (<span class="c-num">0</span>:<span class="c-var">muestras_2s</span>-<span class="c-num">1</span>) / <span class="c-var">fs</span>;  <span class="c-cmt">% vector de tiempo en segundos</span><br>
+    <br>
+    <span class="c-fn">figure</span>(<span class="c-num">1</span>);<br>
+    <span class="c-fn">subplot</span>(<span class="c-num">2</span>, <span class="c-num">1</span>, <span class="c-num">1</span>);<br>
+    <span class="c-fn">plot</span>(<span class="c-var">y</span>(<span class="c-num">1</span>:<span class="c-num">200</span>), <span class="c-str">'Color'</span>, [<span class="c-num">0</span> <span class="c-num">0.9</span> <span class="c-num">0.6</span>]);<br>
+    <span class="c-fn">title</span>(<span class="c-str">'200 primeras muestras'</span>);<br>
+    <span class="c-fn">xlabel</span>(<span class="c-str">'Muestra'</span>); <span class="c-fn">ylabel</span>(<span class="c-str">'Amplitud'</span>);<br>
+    <br>
+    <span class="c-fn">subplot</span>(<span class="c-num">2</span>, <span class="c-num">1</span>, <span class="c-num">2</span>);<br>
+    <span class="c-fn">plot</span>(<span class="c-var">t</span>, <span class="c-var">y</span>(<span class="c-num">1</span>:<span class="c-var">muestras_2s</span>), <span class="c-str">'Color'</span>, [<span class="c-num">0</span> <span class="c-num">0.9</span> <span class="c-num">0.6</span>]);<br>
+    <span class="c-fn">title</span>(<span class="c-str">'Primeros 2 segundos de audio'</span>);<br>
+    <span class="c-fn">xlabel</span>(<span class="c-str">'Tiempo (s)'</span>); <span class="c-fn">ylabel</span>(<span class="c-str">'Amplitud'</span>);<br>
+    <br>
+    <span class="c-cmt">%% 5.5 Figura 2: Espectro de frecuencias (señal original)</span><br>
+    <span class="c-var">N_total</span> = <span class="c-fn">length</span>(<span class="c-var">y</span>);<br>
+    <span class="c-var">Y_fft</span>   = <span class="c-fn">abs</span>(<span class="c-fn">fftshift</span>(<span class="c-fn">fft</span>(<span class="c-var">y</span>)));<br>
+    <span class="c-var">f_eje</span>   = <span class="c-fn">linspace</span>(-<span class="c-var">fs</span>/<span class="c-num">2</span>, <span class="c-var">fs</span>/<span class="c-num">2</span>, <span class="c-var">N_total</span>);<br>
+    <br>
+    <span class="c-fn">figure</span>(<span class="c-num">2</span>);<br>
+    <span class="c-fn">plot</span>(<span class="c-var">f_eje</span>, <span class="c-var">Y_fft</span>);<br>
+    <span class="c-fn">title</span>(<span class="c-str">'Espectro - Señal Original'</span>);<br>
+    <span class="c-fn">xlabel</span>(<span class="c-str">'Frecuencia (Hz)'</span>); <span class="c-fn">ylabel</span>(<span class="c-str">'Magnitud'</span>);<br>
+    <br>
+    <span class="c-cmt">%% 5.6 Submuestreo (Downsampling)</span><br>
+    <span class="c-var">fs_objetivo</span> = <span class="c-num">11025</span>;                           <span class="c-cmt">% nueva fs objetivo</span><br>
+    <span class="c-var">N</span>           = <span class="c-fn">floor</span>(<span class="c-var">fs</span> / <span class="c-var">fs_objetivo</span>);          <span class="c-cmt">% factor = 4</span><br>
+    <span class="c-var">y_down</span>      = <span class="c-fn">downsample</span>(<span class="c-var">y</span>, <span class="c-var">N</span>);               <span class="c-cmt">% submuestrear</span><br>
+    <span class="c-var">fs_new</span>      = <span class="c-var">fs</span> / <span class="c-var">N</span>;                         <span class="c-cmt">% nueva tasa de muestreo</span><br>
+    <br>
+    <span class="c-cmt">%% 5.7 Figura 3: 2s + espectro de señal submuestreada</span><br>
+    <span class="c-var">muestras_2s_new</span> = <span class="c-num">2</span> * <span class="c-var">fs_new</span>;<br>
+    <span class="c-var">t_new</span>           = (<span class="c-num">0</span>:<span class="c-var">muestras_2s_new</span>-<span class="c-num">1</span>) / <span class="c-var">fs_new</span>;<br>
+    <br>
+    <span class="c-fn">figure</span>(<span class="c-num">3</span>);<br>
+    <span class="c-fn">subplot</span>(<span class="c-num">2</span>, <span class="c-num">1</span>, <span class="c-num">1</span>);<br>
+    <span class="c-fn">plot</span>(<span class="c-var">t_new</span>, <span class="c-var">y_down</span>(<span class="c-num">1</span>:<span class="c-var">muestras_2s_new</span>));<br>
+    <span class="c-fn">title</span>(<span class="c-str">'Señal Submuestreada - Primeros 2s'</span>);<br>
+    <br>
+    <span class="c-fn">subplot</span>(<span class="c-num">2</span>, <span class="c-num">1</span>, <span class="c-num">2</span>);<br>
+    <span class="c-var">N_d</span>    = <span class="c-fn">length</span>(<span class="c-var">y_down</span>);<br>
+    <span class="c-var">Y_down</span> = <span class="c-fn">abs</span>(<span class="c-fn">fftshift</span>(<span class="c-fn">fft</span>(<span class="c-var">y_down</span>)));<br>
+    <span class="c-var">f_d</span>    = <span class="c-fn">linspace</span>(-<span class="c-var">fs_new</span>/<span class="c-num">2</span>, <span class="c-var">fs_new</span>/<span class="c-num">2</span>, <span class="c-var">N_d</span>);<br>
+    <span class="c-fn">plot</span>(<span class="c-var">f_d</span>, <span class="c-var">Y_down</span>);<br>
+    <span class="c-fn">title</span>(<span class="c-str">'Espectro - Señal Submuestreada'</span>);<br>
+    <br>
+    <span class="c-cmt">%% 5.8 Crear archivo de audio comprimido (8 bits)</span><br>
+    <span class="c-fn">audiowrite</span>(<span class="c-str">'bearsound_comprimido.wav'</span>, <span class="c-var">y_down</span>, <span class="c-var">fs_new</span>, ...<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="c-str">'BitsPerSample'</span>, <span class="c-num">8</span>);<br>
+    <br>
+    <span class="c-cmt">%% 5.9 Calcular relación de compresión</span><br>
+    <span class="c-var">bits_orig</span> = <span class="c-var">info</span>.BitsPerSample;<br>
+    <span class="c-var">RC</span> = (<span class="c-var">fs</span> * <span class="c-var">bits_orig</span>) / (<span class="c-var">fs_new</span> * <span class="c-num">8</span>);<br>
+    <span class="c-fn">fprintf</span>(<span class="c-str">'Relación de compresión: %.2f : 1\n'</span>, <span class="c-var">RC</span>);
+  </div>
+
+  <div class="note-box note-warn" style="margin-top:0;">
+    ⚠️ Asegúrate de que <code>bearsound.wav</code> esté en la carpeta de trabajo de MATLAB antes de ejecutar el script. Verifica con <code>pwd</code> y <code>dir</code>.
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SLIDE 4 — IMAGEN: DCT TEORÍA
+════════════════════════════════════════════ -->
+<div class="slide" id="slide-4">
+  <div class="slide-tag">Parte 2 · Teoría</div>
+  <h2>Compresión de <span class="hl-img">Imágenes</span> — DCT y JPEG</h2>
+
+  <div class="grid-2">
+    <div>
+      <div class="note-box note-info">
+        <strong>¿Qué es la DCT (Transformada de Coseno Discreta)?</strong><br>
+        Convierte un bloque de pixeles del dominio espacial (intensidades) al dominio frecuencial (coeficientes de cosenos). La mayor parte de la energía visual se concentra en muy pocos coeficientes — los de baja frecuencia.
+      </div>
+
+      <div class="formula">
+        DCT-2D: F(u,v) = C(u)·C(v) · Σ Σ f(x,y)·<br>
+        cos[(2x+1)·u·π/16] · cos[(2y+1)·v·π/16]<br>
+        <br>
+        <span style="color:var(--audio);">C(0)=1/√2</span>, <span style="color:var(--accent);">C(n≠0)=1</span>
+      </div>
+
+      <div class="card card-img">
+        <h3 class="hl-img">Componente DC vs AC</h3>
+        <p style="font-size:0.88rem;"><strong style="color:var(--yellow);">DC (F[0,0]):</strong> El coeficiente en la esquina superior izquierda del bloque DCT. Representa el promedio de todos los pixeles del bloque — el valor de "brillo general". Es el más importante.</p>
+        <p style="font-size:0.88rem;"><strong style="color:var(--muted);">AC (resto):</strong> Los demás coeficientes representan variaciones — texturas, bordes, detalles finos. Los de alta frecuencia (esquina inferior derecha) son los menos perceptibles y los primeros en eliminarse.</p>
+      </div>
+    </div>
+
+    <div>
+      <div class="card card-img">
+        <h3 class="hl-img">Proceso JPEG — Paso a Paso</h3>
+        <ul class="step-list">
+          <li class="step-img"><div class="step-num">1</div><div>Convertir imagen a <strong>escala de grises</strong> (im2gray). Rango 0–255.</div></li>
+          <li class="step-img"><div class="step-num">2</div><div>Restar 128 para <strong>centrar los valores</strong> en torno a 0 (–128 a +127).</div></li>
+          <li class="step-img"><div class="step-num">3</div><div>Dividir en <strong>bloques de 8×8 pixeles</strong>.</div></li>
+          <li class="step-img"><div class="step-num">4</div><div>Aplicar <strong>DCT 2D</strong> a cada bloque → 64 coeficientes por bloque.</div></li>
+          <li class="step-img"><div class="step-num">5</div><div><strong>Cuantizar</strong> dividiendo cada coeficiente por la tabla Q y redondeando. Los valores pequeños se vuelven cero.</div></li>
+          <li class="step-img"><div class="step-num">6</div><div>Guardar (muchos ceros → alta compresión por codificación RLE/Huffman).</div></li>
+          <li class="step-img"><div class="step-num">7</div><div><strong>Reconstrucción:</strong> Multiplicar por Q, aplicar IDCT, sumar 128.</div></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="sep">
+  <h3>Tabla de Cuantización JPEG para <span class="hl-img">Luminancia</span></h3>
+  <p style="font-size:0.88rem;margin-bottom:12px;">Los coeficientes DCT se dividen por estos valores y se redondean. Valores <span class="hl-img">altos</span> = más pérdida. Valores altos están en las frecuencias altas (esquina inf-der) porque el ojo humano es poco sensible a ellos.</p>
+  <table class="qtable" id="qtable"></table>
+
+  <div style="margin-top:10px;display:flex;gap:16px;font-family:var(--mono);font-size:11px;">
+    <span><span style="color:var(--audio);">■</span> Baja cuantización (más detalle)</span>
+    <span><span style="color:var(--yellow);">■</span> Media cuantización</span>
+    <span><span style="color:var(--img);">■</span> Alta cuantización (más pérdida)</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SLIDE 5 — DCT INTERACTIVA
+════════════════════════════════════════════ -->
+<div class="slide" id="slide-5">
+  <div class="slide-tag">Parte 2 · Simulación Interactiva</div>
+  <h2>DCT Interactiva — <span class="hl-img">Visualización en tiempo real</span></h2>
+
+  <div class="grid-2">
+    <div>
+      <div class="card">
+        <h3>Bloque Original 8×8 (click para editar)</h3>
+        <canvas id="blockOrig" width="240" height="240" style="border:1px solid var(--border);cursor:crosshair;"></canvas>
+        <div class="ctrl-row" style="margin-top:12px;">
+          <span class="ctrl-label">Patrón</span>
+          <select id="patternSel" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-family:var(--mono);font-size:12px;flex:1;">
+            <option value="gradient">Gradiente suave</option>
+            <option value="edge">Borde vertical</option>
+            <option value="noise">Ruido aleatorio</option>
+            <option value="checker">Tablero (alta freq)</option>
+            <option value="uniform">Uniforme</option>
+          </select>
+        </div>
+        <button class="btn btn-img" style="width:100%;justify-content:center;" onclick="loadPattern()">Cargar patrón</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h3>Bloque DCT (coeficientes)</h3>
+        <canvas id="blockDCT" width="240" height="240" style="border:1px solid var(--border);"></canvas>
+        <div style="margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--muted);">
+          Hover para ver valor del coeficiente. <span style="color:var(--img);">DC[0,0]</span> = <span id="dcVal" class="hl-img">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:4px;">
+    <h3>Cuantización — Factor Q</h3>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Multiplicador tabla Q</span>
+      <input type="range" id="qSlider" min="0.1" max="5" step="0.1" value="1" class="range-img">
+      <span class="val-badge hl-img" id="qVal">×1.0</span>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Calidad equivalente</span>
+      <div style="flex:1;height:10px;background:var(--border);border-radius:5px;overflow:hidden;">
+        <div id="qualBar" style="height:100%;background:linear-gradient(90deg,var(--img),var(--yellow),var(--audio));width:50%;transition:width 0.3s;border-radius:5px;"></div>
+      </div>
+      <span class="val-badge" id="qualVal" style="color:var(--audio);">50%</span>
+    </div>
+
+    <div class="grid-2" style="margin-top:12px;">
+      <div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px;">Bloque cuantizado (coefs redondeados):</div>
+        <canvas id="blockQuant" width="240" height="240" style="border:1px solid var(--border);width:100%;"></canvas>
+      </div>
+      <div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px;">Reconstrucción IDCT:</div>
+        <canvas id="blockRecon" width="240" height="240" style="border:1px solid var(--border);width:100%;"></canvas>
+        <div style="margin-top:8px;font-family:var(--mono);font-size:11px;">
+          Ceros en cuantización: <span class="hl-img" id="zerosVal">—</span>/64 &nbsp;|&nbsp; Error PSNR: <span class="hl-acc" id="psnrVal">—</span> dB
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SLIDE 6 — CÓDIGO IMAGEN
+════════════════════════════════════════════ -->
+<div class="slide" id="slide-6">
+  <div class="slide-tag">Parte 2 · Código MATLAB completo</div>
+  <h2>Código Completo — <span class="hl-img">Compresión de Imagen</span></h2>
+
+  <div class="func-grid" id="imgFuncGrid" style="margin-bottom:20px;">
+    <div class="func-card img-func" onclick="showFuncImg('im2gray')">
+      <div class="func-name">im2gray()</div>
+      <div class="func-desc">Convierte imagen RGB a escala de grises</div>
+    </div>
+    <div class="func-card img-func" onclick="showFuncImg('dct2')">
+      <div class="func-name">dct2()</div>
+      <div class="func-desc">DCT 2D de una matriz / bloque</div>
+    </div>
+    <div class="func-card img-func" onclick="showFuncImg('idct2')">
+      <div class="func-name">idct2()</div>
+      <div class="func-desc">Transformada coseno discreta inversa</div>
+    </div>
+    <div class="func-card img-func" onclick="showFuncImg('imwrite')">
+      <div class="func-name">imwrite()</div>
+      <div class="func-desc">Guarda imagen en disco</div>
+    </div>
+    <div class="func-card img-func" onclick="showFuncImg('montage')">
+      <div class="func-name">montage()</div>
+      <div class="func-desc">Muestra varias imágenes en una figura</div>
+    </div>
+  </div>
+
+  <div class="func-detail" id="fdi-im2gray">
+    <h3 class="hl-img">im2gray(img)</h3>
+    <div class="code-block"><span class="code-label">MATLAB</span>
+<span class="c-var">img_color</span> = <span class="c-fn">imread</span>(<span class="c-str">'imagen.png'</span>);  <span class="c-cmt">% RGB imagen</span><br>
+<span class="c-var">img_gray</span>  = <span class="c-fn">im2gray</span>(<span class="c-var">img_color</span>);  <span class="c-cmt">% escala de grises</span><br>
+<span class="c-cmt">% Si ya es gris, no hace nada. Usa fórmula: 0.299R+0.587G+0.114B</span></div>
+  </div>
+  <div class="func-detail" id="fdi-dct2">
+    <h3 class="hl-img">dct2(A)</h3>
+    <div class="code-block"><span class="code-label">MATLAB</span>
+<span class="c-var">bloque</span>  = <span class="c-fn">double</span>(<span class="c-var">img_gray</span>(<span class="c-num">1</span>:<span class="c-num">8</span>, <span class="c-num">1</span>:<span class="c-num">8</span>)) - <span class="c-num">128</span>;  <span class="c-cmt">% centrar</span><br>
+<span class="c-var">D</span> = <span class="c-fn">dct2</span>(<span class="c-var">bloque</span>);   <span class="c-cmt">% retorna 64 coeficientes DCT</span><br>
+<span class="c-cmt">% D(1,1) = componente DC</span></div>
+  </div>
+  <div class="func-detail" id="fdi-idct2">
+    <h3 class="hl-img">idct2(D)</h3>
+    <div class="code-block"><span class="code-label">MATLAB</span>
+<span class="c-var">bloque_rec</span> = <span class="c-fn">idct2</span>(<span class="c-var">D</span>) + <span class="c-num">128</span>;   <span class="c-cmt">% IDCT + resumar 128</span><br>
+<span class="c-var">bloque_rec</span> = <span class="c-fn">uint8</span>(<span class="c-fn">round</span>(<span class="c-var">bloque_rec</span>));  <span class="c-cmt">% a enteros</span></div>
+  </div>
+  <div class="func-detail" id="fdi-imwrite">
+    <h3 class="hl-img">imwrite(img, filename)</h3>
+    <div class="code-block"><span class="code-label">MATLAB</span>
+<span class="c-fn">imwrite</span>(<span class="c-var">img_gray</span>, <span class="c-str">'imagen_gris.png'</span>);<br>
+<span class="c-fn">imwrite</span>(<span class="c-var">img_rec</span>,  <span class="c-str">'imagen_jpeg.jpg'</span>, <span class="c-str">'Quality'</span>, <span class="c-num">50</span>);</div>
+  </div>
+  <div class="func-detail" id="fdi-montage">
+    <h3 class="hl-img">montage({img1, img2, ...})</h3>
+    <div class="code-block"><span class="code-label">MATLAB</span>
+<span class="c-fn">figure</span>;<br>
+<span class="c-fn">montage</span>({<span class="c-var">img_gray</span>, <span class="c-var">img_reconstruida</span>}, ...<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="c-str">'Size'</span>, [<span class="c-num">1</span> <span class="c-num">2</span>],      <span class="c-cmt">% 1 fila, 2 columnas</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="c-str">'DisplayRange'</span>, [<span class="c-num">0</span> <span class="c-num">255</span>]);</div>
+  </div>
+
+  <div class="code-block" style="margin-top:16px;">
+    <span class="code-label">MATLAB · practica6_imagen.m</span>
+    <span class="c-cmt">%% ── PRÁCTICA 6: COMPRESIÓN DE IMAGEN ─────────────────────────────</span><br>
+    <span class="c-fn">clc</span>; <span class="c-fn">clear</span>; <span class="c-fn">close</span> all;<br><br>
+    <span class="c-cmt">%% 5.1 Leer imagen</span><br>
+    <span class="c-var">img</span> = <span class="c-fn">imread</span>(<span class="c-str">'imagen.png'</span>);   <span class="c-cmt">% reemplaza con tu imagen</span><br><br>
+    <span class="c-cmt">%% 5.2 Convertir a escala de grises</span><br>
+    <span class="c-var">img_gray</span> = <span class="c-fn">im2gray</span>(<span class="c-var">img</span>);<br>
+    <span class="c-var">img_d</span>    = <span class="c-fn">double</span>(<span class="c-var">img_gray</span>);   <span class="c-cmt">% para operaciones matemáticas</span><br><br>
+    <span class="c-cmt">%% 5.3 DCT global de la imagen</span><br>
+    <span class="c-var">img_dct_global</span> = <span class="c-fn">dct2</span>(<span class="c-var">img_d</span>);<br><br>
+    <span class="c-cmt">%% 5.3 Mostrar dominio DCT (escala log para visualizar)</span><br>
+    <span class="c-fn">figure</span>(<span class="c-num">1</span>); <span class="c-fn">imshow</span>(<span class="c-fn">log</span>(<span class="c-num">1</span> + <span class="c-fn">abs</span>(<span class="c-var">img_dct_global</span>)), []);<br>
+    <span class="c-fn">title</span>(<span class="c-str">'Imagen en dominio DCT'</span>); <span class="c-fn">colormap</span>(jet);<br><br>
+    <span class="c-cmt">%% 5.4 Tabla de cuantización JPEG (luminancia)</span><br>
+    <span class="c-var">Q</span> = [<span class="c-num">16</span> <span class="c-num">11</span> <span class="c-num">10</span> <span class="c-num">16</span> <span class="c-num">24</span>  <span class="c-num">40</span>  <span class="c-num">51</span>  <span class="c-num">61</span>; ...<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-num">12</span> <span class="c-num">12</span> <span class="c-num">14</span> <span class="c-num">19</span> <span class="c-num">26</span>  <span class="c-num">58</span>  <span class="c-num">60</span>  <span class="c-num">55</span>; ...<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-num">14</span> <span class="c-num">13</span> <span class="c-num">16</span> <span class="c-num">24</span> <span class="c-num">40</span>  <span class="c-num">57</span>  <span class="c-num">69</span>  <span class="c-num">56</span>; ...<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-num">14</span> <span class="c-num">17</span> <span class="c-num">22</span> <span class="c-num">29</span> <span class="c-num">51</span>  <span class="c-num">87</span>  <span class="c-num">80</span>  <span class="c-num">62</span>; ...<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-num">18</span> <span class="c-num">22</span> <span class="c-num">37</span> <span class="c-num">56</span> <span class="c-num">68</span> <span class="c-num">109</span> <span class="c-num">103</span>  <span class="c-num">77</span>; ...<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-num">24</span> <span class="c-num">35</span> <span class="c-num">55</span> <span class="c-num">64</span> <span class="c-num">81</span> <span class="c-num">104</span> <span class="c-num">113</span>  <span class="c-num">92</span>; ...<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-num">49</span> <span class="c-num">64</span> <span class="c-num">78</span> <span class="c-num">87</span> <span class="c-num">103</span> <span class="c-num">121</span> <span class="c-num">120</span> <span class="c-num">101</span>; ...<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-num">72</span> <span class="c-num">92</span> <span class="c-num">95</span> <span class="c-num">98</span> <span class="c-num">112</span> <span class="c-num">100</span> <span class="c-num">103</span>  <span class="c-num">99</span>];<br><br>
+    <span class="c-cmt">%% 5.5 Cuantización por bloques 8×8</span><br>
+    [<span class="c-var">rows</span>, <span class="c-var">cols</span>] = <span class="c-fn">size</span>(<span class="c-var">img_d</span>);<br>
+    <span class="c-var">img_quant</span>  = <span class="c-fn">zeros</span>(<span class="c-var">rows</span>, <span class="c-var">cols</span>);<br>
+    <span class="c-var">img_recon</span>  = <span class="c-fn">zeros</span>(<span class="c-var">rows</span>, <span class="c-var">cols</span>);<br><br>
+    <span class="c-kw">for</span> <span class="c-var">r</span> = <span class="c-num">1</span>:<span class="c-num">8</span>:<span class="c-var">rows</span><br>
+    &nbsp;&nbsp;<span class="c-kw">for</span> <span class="c-var">c</span> = <span class="c-num">1</span>:<span class="c-num">8</span>:<span class="c-var">cols</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="c-var">bloque</span>    = <span class="c-var">img_d</span>(<span class="c-var">r</span>:<span class="c-var">r</span>+<span class="c-num">7</span>, <span class="c-var">c</span>:<span class="c-var">c</span>+<span class="c-num">7</span>) - <span class="c-num">128</span>;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="c-var">D</span>         = <span class="c-fn">dct2</span>(<span class="c-var">bloque</span>);<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="c-var">D_q</span>       = <span class="c-fn">round</span>(<span class="c-var">D</span> ./ <span class="c-var">Q</span>);           <span class="c-cmt">% cuantizar</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="c-var">img_quant</span>(<span class="c-var">r</span>:<span class="c-var">r</span>+<span class="c-num">7</span>, <span class="c-var">c</span>:<span class="c-var">c</span>+<span class="c-num">7</span>) = <span class="c-var">D_q</span>;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="c-var">D_rec</span>     = <span class="c-var">D_q</span> .* <span class="c-var">Q</span>;             <span class="c-cmt">% descuantizar</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<span class="c-var">img_recon</span>(<span class="c-var">r</span>:<span class="c-var">r</span>+<span class="c-num">7</span>, <span class="c-var">c</span>:<span class="c-var">c</span>+<span class="c-num">7</span>) = <span class="c-fn">idct2</span>(<span class="c-var">D_rec</span>) + <span class="c-num">128</span>;<br>
+    &nbsp;&nbsp;<span class="c-kw">end</span><br>
+    <span class="c-kw">end</span><br><br>
+    <span class="c-var">img_recon</span> = <span class="c-fn">uint8</span>(<span class="c-fn">max</span>(<span class="c-num">0</span>, <span class="c-fn">min</span>(<span class="c-num">255</span>, <span class="c-var">img_recon</span>)));<br><br>
+    <span class="c-cmt">%% 5.5 Mostrar imagen DCT cuantizada</span><br>
+    <span class="c-fn">figure</span>(<span class="c-num">2</span>); <span class="c-fn">subplot</span>(<span class="c-num">1</span>,<span class="c-num">2</span>,<span class="c-num">1</span>);<br>
+    <span class="c-fn">imshow</span>(<span class="c-fn">log</span>(<span class="c-num">1</span>+<span class="c-fn">abs</span>(<span class="c-var">img_dct_global</span>)),[]); <span class="c-fn">title</span>(<span class="c-str">'DCT original'</span>);<br>
+    <span class="c-fn">subplot</span>(<span class="c-num">1</span>,<span class="c-num">2</span>,<span class="c-num">2</span>);<br>
+    <span class="c-fn">imshow</span>(<span class="c-fn">log</span>(<span class="c-num">1</span>+<span class="c-fn">abs</span>(<span class="c-var">img_quant</span>)),[]); <span class="c-fn">title</span>(<span class="c-str">'DCT cuantizada'</span>);<br><br>
+    <span class="c-cmt">%% 5.7 Montage: original vs reconstruida</span><br>
+    <span class="c-fn">figure</span>(<span class="c-num">3</span>);<br>
+    <span class="c-fn">montage</span>({<span class="c-var">img_gray</span>, <span class="c-var">img_recon</span>}, <span class="c-str">'Size'</span>, [<span class="c-num">1</span> <span class="c-num">2</span>]);<br>
+    <span class="c-fn">title</span>(<span class="c-str">'Original (izq) vs Reconstruida JPEG (der)'</span>);<br><br>
+    <span class="c-cmt">%% 5.8 Variar factor de cuantización</span><br>
+    <span class="c-kw">for</span> <span class="c-var">factor</span> = [<span class="c-num">0.6</span>, <span class="c-num">1</span>, <span class="c-num">2</span>]<br>
+    &nbsp;&nbsp;<span class="c-var">Q_var</span> = <span class="c-fn">round</span>(<span class="c-var">Q</span> * <span class="c-var">factor</span>);<br>
+    &nbsp;&nbsp;<span class="c-cmt">% ... (repetir el proceso con Q_var)</span><br>
+    <span class="c-kw">end</span><br><br>
+    <span class="c-cmt">%% 5.10 Tasa de compresión</span><br>
+    <span class="c-var">zeros_totales</span> = <span class="c-fn">sum</span>(<span class="c-fn">sum</span>(<span class="c-var">img_quant</span> == <span class="c-num">0</span>));<br>
+    <span class="c-var">total_coefs</span>   = <span class="c-var">rows</span> * <span class="c-var">cols</span>;<br>
+    <span class="c-var">tasa</span> = <span class="c-var">zeros_totales</span> / <span class="c-var">total_coefs</span> * <span class="c-num">100</span>;<br>
+    <span class="c-fn">fprintf</span>(<span class="c-str">'Coeficientes en cero: %.1f%%\n'</span>, <span class="c-var">tasa</span>);
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SLIDE 7 — COMPRESIÓN COMPARATIVA
+════════════════════════════════════════════ -->
+<div class="slide" id="slide-7">
+  <div class="slide-tag">Resultados · Análisis</div>
+  <h2>Análisis de <span class="hl-acc">Compresión</span> y Calidad</h2>
+
+  <!-- AUDIO METRICS -->
+  <div class="card card-audio" style="margin-bottom:20px;">
+    <h3 class="hl-audio">🎵 Resultado — Compresión de Audio</h3>
+    <div class="metric-row" style="margin-top:12px;">
+      <div class="metric">
+        <div class="metric-val" style="color:var(--muted);">44,100</div>
+        <div class="metric-lbl">Hz original (fs)</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val" style="color:var(--audio);">11,025</div>
+        <div class="metric-lbl">Hz submuestreado</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val" style="color:var(--yellow);">16→8</div>
+        <div class="metric-lbl">bits por muestra</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val" style="color:var(--img);">8:1</div>
+        <div class="metric-lbl">relación compresión</div>
+      </div>
+    </div>
+    <div class="formula">
+      RC = (fs_orig × bits_orig) / (fs_new × bits_new)<br>
+      RC = (44100 × 16) / (11025 × 8) = 705600 / 88200 = <span class="hl-audio">8</span>
+    </div>
+    <div class="note-box note-ok" style="margin-bottom:0;">
+      El archivo comprimido es <strong>8 veces más pequeño</strong>. La pérdida de calidad es perceptible (voz inteligible pero con brillo reducido y posible aliasing en frecuencias altas).
+    </div>
+  </div>
+
+  <!-- IMAGE QUALITY INTERACTIVE -->
+  <div class="card card-img">
+    <h3 class="hl-img">🖼 Efecto del Factor Q en Imagen — Simulación</h3>
+    <div class="ctrl-row" style="margin-top:12px;">
+      <span class="ctrl-label">Multiplicador Q</span>
+      <input type="range" id="qCompSlider" min="0.2" max="5" step="0.1" value="1" class="range-img">
+      <span class="val-badge hl-img" id="qCompVal">×1.0</span>
+    </div>
+
+    <div class="grid-3" style="margin-top:12px;">
+      <div style="text-align:center;">
+        <canvas id="simOrig" width="200" height="200" style="width:100%;border:1px solid var(--border);border-radius:8px;"></canvas>
+        <div style="font-family:var(--mono);font-size:11px;margin-top:6px;color:var(--muted);">Original</div>
+      </div>
+      <div style="text-align:center;">
+        <canvas id="simComp" width="200" height="200" style="width:100%;border:1px solid var(--border);border-radius:8px;"></canvas>
+        <div style="font-family:var(--mono);font-size:11px;margin-top:6px;" id="simLabel">Q×1.0 — Estándar</div>
+      </div>
+      <div style="text-align:center;">
+        <canvas id="simDiff" width="200" height="200" style="width:100%;border:1px solid var(--border);border-radius:8px;"></canvas>
+        <div style="font-family:var(--mono);font-size:11px;margin-top:6px;color:var(--muted);">Diferencia amplificada</div>
+      </div>
+    </div>
+
+    <div class="metric-row" style="margin-top:16px;">
+      <div class="metric">
+        <div class="metric-val" id="m-zeros" style="color:var(--img);">—</div>
+        <div class="metric-lbl">% coefs en cero</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val" id="m-psnr" style="color:var(--accent);">—</div>
+        <div class="metric-lbl">PSNR (dB)</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val" id="m-rc" style="color:var(--audio);">—</div>
+        <div class="metric-lbl">compresión aprox</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val" id="m-quality" style="color:var(--yellow);">—</div>
+        <div class="metric-lbl">calidad visual</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-info">
+    <h3 class="hl-acc">Interpretación de Resultados</h3>
+    <div class="grid-2">
+      <div>
+        <p style="font-size:0.88rem;"><strong>Q × 0.6 (mejor calidad):</strong> Tabla más pequeña → divisores menores → más coeficientes sobreviven → más detalle preservado → menos compresión.</p>
+        <p style="font-size:0.88rem;"><strong>Q × 1.0 (estándar JPEG-75%):</strong> Balance entre calidad y tamaño. Típicamente 60–75% de coeficientes en cero.</p>
+      </div>
+      <div>
+        <p style="font-size:0.88rem;"><strong>Q × 2.0 (más compresión):</strong> Tabla mayor → divisores más grandes → más coeficientes se redondean a cero → artefactos de bloque visibles en bordes.</p>
+        <p style="font-size:0.88rem;"><strong>PSNR > 40 dB:</strong> Calidad excelente. <strong>30–40 dB:</strong> Buena. <strong>&lt;30 dB:</strong> Degradación visible.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end slides-wrap -->
+
+<!-- NAV ARROWS -->
+<div class="slide-nav">
+  <button class="snav-btn" onclick="prevSlide()">‹</button>
+  <button class="snav-btn" onclick="nextSlide()">›</button>
+</div>
+
+<script>
+// ── NAVIGATION ──────────────────────────────────────────────
+let current = 0;
+const totalSlides = 8;
+const tabs = document.querySelectorAll('.nav-tab');
+const slides = document.querySelectorAll('.slide');
+
+function goTo(i) {
+  slides[current].classList.remove('active');
+  tabs[current].classList.remove('active');
+  current = i;
+  slides[current].classList.add('active');
+  tabs[current].classList.add('active');
+  document.getElementById('progress-bar').style.width = ((current / (totalSlides-1)) * 100) + '%';
+  // init slide-specific stuff
+  if (current === 0) initHeroWave();
+  if (current === 1) { initDsCanvas(); }
+  if (current === 4) initQTable();
+  if (current === 5) initDCTInteractive();
+  if (current === 7) initCompSim();
+  window.scrollTo(0, 0);
+}
+
+function nextSlide() { if(current < totalSlides-1) goTo(current+1); }
+function prevSlide() { if(current > 0) goTo(current-1); }
+
+document.addEventListener('keydown', e => {
+  if(e.key === 'ArrowRight') nextSlide();
+  if(e.key === 'ArrowLeft')  prevSlide();
+});
+
+// ── HERO WAVE ───────────────────────────────────────────────
+function initHeroWave() {
+  const canvas = document.getElementById('heroWave');
+  const ctx = canvas.getContext('2d');
+  let t = 0;
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const W = canvas.width, H = canvas.height;
+    ctx.strokeStyle = 'rgba(0,229,160,0.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for(let x=0;x<W;x++){
+      const y = H/2 + (Math.sin((x/W*12)+t)*20 + Math.sin((x/W*7)+t*1.3)*12 + Math.sin((x/W*23)+t*0.5)*5);
+      x===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(77,166,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for(let x=0;x<W;x++){
+      const y = H/2 + (Math.sin((x/W*5)+t*0.7)*15 + Math.cos((x/W*19)+t*1.1)*8);
+      x===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    t += 0.04;
+    if(current===0) requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// ── DOWNSAMPLING CANVAS ──────────────────────────────────────
+let dsAnim;
+function initDsCanvas() {
+  const canvas = document.getElementById('dsCanvas');
+  const ctx = canvas.getContext('2d');
+  const dsSlider = document.getElementById('dsSlider');
+  const freqSlider = document.getElementById('freqSlider');
+  const dsVal = document.getElementById('dsVal');
+  const freqVal = document.getElementById('freqVal');
+  const warn = document.getElementById('dsWarning');
+
+  function drawDS() {
+    const W = canvas.width, H = canvas.height;
+    const N = parseInt(dsSlider.value);
+    const freq = parseInt(freqSlider.value);
+    const fs = 100; // samples
+    dsVal.textContent = N + '×';
+    freqVal.textContent = freq + ' Hz';
+    ctx.clearRect(0,0,W,H);
+
+    // Background grid
+    ctx.strokeStyle = 'rgba(30,48,80,0.5)';
+    ctx.lineWidth = 1;
+    for(let y=0;y<=H;y+=H/4){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }
+
+    const pts = 200;
+    // Original signal
+    ctx.strokeStyle = '#00e5a0'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for(let i=0;i<pts;i++){
+      const x = i/pts*W;
+      const y = H/2 - Math.sin(2*Math.PI*freq*i/pts)*H*0.38;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    // Sampled points
+    const sampledPts = [];
+    for(let i=0;i<pts;i+=N){
+      const x = i/pts*W;
+      const y = H/2 - Math.sin(2*Math.PI*freq*i/pts)*H*0.38;
+      sampledPts.push({x,y,i});
+      ctx.fillStyle='#ff6b6b';
+      ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2); ctx.fill();
+    }
+
+    // Reconstructed
+    if(sampledPts.length > 1){
+      ctx.strokeStyle='rgba(255,209,102,0.8)'; ctx.lineWidth=1.5; ctx.setLineDash([4,4]);
+      ctx.beginPath();
+      sampledPts.forEach((p,idx)=>{
+        const next = sampledPts[idx+1] || p;
+        ctx.moveTo(p.x,p.y);
+        for(let rx=p.x;rx<(next.x||W);rx+=1){
+          ctx.lineTo(rx,p.y);
+        }
+      });
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    // Nyquist check
+    const aliasing = N > fs/(2*freq);
+    warn.style.display = aliasing ? 'block' : 'none';
+  }
+
+  dsSlider.oninput = drawDS;
+  freqSlider.oninput = drawDS;
+  drawDS();
+}
+
+// ── QTABLE ──────────────────────────────────────────────────
+const Q_JPEG = [
+  [16,11,10,16,24,40,51,61],
+  [12,12,14,19,26,58,60,55],
+  [14,13,16,24,40,57,69,56],
+  [14,17,22,29,51,87,80,62],
+  [18,22,37,56,68,109,103,77],
+  [24,35,55,64,81,104,113,92],
+  [49,64,78,87,103,121,120,101],
+  [72,92,95,98,112,100,103,99]
+];
+
+function initQTable() {
+  const tbl = document.getElementById('qtable');
+  if(tbl.innerHTML !== '') return;
+  Q_JPEG.forEach(row => {
+    const tr = document.createElement('tr');
+    row.forEach(v => {
+      const td = document.createElement('td');
+      td.textContent = v;
+      td.className = v <= 20 ? 'qtable-low' : v <= 60 ? 'qtable-med' : 'qtable-high';
+      tr.appendChild(td);
+    });
+    tbl.appendChild(tr);
+  });
+}
+
+// ── DCT MATH UTILS ──────────────────────────────────────────
+function dct2(block) {
+  const N = 8;
+  const out = Array.from({length:N},()=>new Array(N).fill(0));
+  for(let u=0;u<N;u++) for(let v=0;v<N;v++){
+    let sum=0;
+    for(let x=0;x<N;x++) for(let y=0;y<N;y++){
+      sum += block[x][y] * Math.cos((2*x+1)*u*Math.PI/16) * Math.cos((2*y+1)*v*Math.PI/16);
+    }
+    const cu = u===0 ? 1/Math.sqrt(2) : 1;
+    const cv = v===0 ? 1/Math.sqrt(2) : 1;
+    out[u][v] = 0.25 * cu * cv * sum;
+  }
+  return out;
+}
+
+function idct2(D) {
+  const N = 8;
+  const out = Array.from({length:N},()=>new Array(N).fill(0));
+  for(let x=0;x<N;x++) for(let y=0;y<N;y++){
+    let sum=0;
+    for(let u=0;u<N;u++) for(let v=0;v<N;v++){
+      const cu = u===0?1/Math.sqrt(2):1;
+      const cv = v===0?1/Math.sqrt(2):1;
+      sum += cu*cv*D[u][v]*Math.cos((2*x+1)*u*Math.PI/16)*Math.cos((2*y+1)*v*Math.PI/16);
+    }
+    out[x][y] = 0.25*sum;
+  }
+  return out;
+}
+
+function renderBlock(canvas, data, minV, maxV, colorFn) {
+  const ctx = canvas.getContext('2d');
+  const N = 8, cw = canvas.width/N, ch = canvas.height/N;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    const v = data[r][c];
+    const t = Math.max(0,Math.min(1,(v-minV)/(maxV-minV)));
+    ctx.fillStyle = colorFn ? colorFn(v,t) : `rgb(${Math.round(t*255)},${Math.round(t*255)},${Math.round(t*255)})`;
+    ctx.fillRect(c*cw, r*ch, cw, ch);
+    ctx.strokeStyle='rgba(30,48,80,0.5)';ctx.lineWidth=0.5;
+    ctx.strokeRect(c*cw,r*ch,cw,ch);
+  }
+}
+
+// ── DCT INTERACTIVE ─────────────────────────────────────────
+let blockData = Array.from({length:8},()=>new Array(8).fill(128));
+
+function loadPattern() {
+  const p = document.getElementById('patternSel').value;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    if(p==='gradient') blockData[r][c] = Math.round((r+c)/14*200+28);
+    else if(p==='edge') blockData[r][c] = c<4 ? 50 : 200;
+    else if(p==='noise') blockData[r][c] = Math.round(Math.random()*255);
+    else if(p==='checker') blockData[r][c] = (r+c)%2===0 ? 220 : 30;
+    else blockData[r][c] = 128;
+  }
+  updateDCTInteractive();
+}
+
+function initDCTInteractive() {
+  loadPattern();
+  document.getElementById('qSlider').oninput = updateDCTInteractive;
+
+  const origCanvas = document.getElementById('blockOrig');
+  origCanvas.addEventListener('mousemove', e => {
+    const rect = origCanvas.getBoundingClientRect();
+    const N=8;
+    const c = Math.floor((e.clientX-rect.left)/rect.width*N);
+    const r = Math.floor((e.clientY-rect.top)/rect.height*N);
+    if(r>=0&&r<N&&c>=0&&c<N) {
+      blockData[r][c] = Math.round(128+Math.sin(Date.now()/500)*80);
+      updateDCTInteractive();
+    }
+  });
+}
+
+function updateDCTInteractive() {
+  const qf = parseFloat(document.getElementById('qSlider').value);
+  document.getElementById('qVal').textContent = '×' + qf.toFixed(1);
+  const qual = Math.max(0,Math.min(100,Math.round((1-Math.min(qf,5)/5)*100)));
+  document.getElementById('qualBar').style.width = qual+'%';
+  document.getElementById('qualVal').textContent = qual+'%';
+  document.getElementById('qualVal').style.color = qual>60?'var(--audio)':qual>30?'var(--yellow)':'var(--img)';
+
+  // center
+  const centered = blockData.map(r=>r.map(v=>v-128));
+  const D = dct2(centered);
+  document.getElementById('dcVal').textContent = D[0][0].toFixed(1);
+
+  // quantize
+  const Dq = D.map((r,ri)=>r.map((v,ci)=>Math.round(v/(Q_JPEG[ri][ci]*qf))));
+  const zeros = Dq.flat().filter(v=>v===0).length;
+  document.getElementById('zerosVal').textContent = zeros;
+
+  // dequant + recon
+  const Drec = Dq.map((r,ri)=>r.map((v,ci)=>v*Q_JPEG[ri][ci]*qf));
+  const rec = idct2(Drec).map(r=>r.map(v=>Math.max(0,Math.min(255,v+128))));
+
+  // PSNR
+  let mse=0;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) mse+=Math.pow(blockData[r][c]-rec[r][c],2);
+  mse/=64;
+  const psnr = mse>0 ? (10*Math.log10(255*255/mse)).toFixed(1) : '∞';
+  document.getElementById('psnrVal').textContent = psnr+' dB';
+
+  renderBlock(document.getElementById('blockOrig'), blockData, 0, 255);
+  renderBlock(document.getElementById('blockDCT'), D, -500, 500, (v,t) => {
+    const r = v>0 ? Math.round(t*230) : 0;
+    const b = v<0 ? Math.round((1-t)*200) : 0;
+    return `rgb(${r},${Math.round(t*80)},${b})`;
+  });
+  renderBlock(document.getElementById('blockQuant'), Dq, -20, 20, (v,t) => {
+    if(v===0) return 'rgba(255,107,107,0.12)';
+    return `rgb(${Math.round(t*200)},${Math.round(t*200)},${Math.round(t*255)})`;
+  });
+  renderBlock(document.getElementById('blockRecon'), rec, 0, 255);
+}
+
+// ── FUNC DETAILS ─────────────────────────────────────────────
+const funcState = {};
+function showFunc(id) {
+  const el = document.getElementById('fd-'+id);
+  const cards = document.querySelectorAll('#audioFuncGrid .func-card');
+  // toggle
+  if(funcState[id]) {
+    el.classList.remove('open');
+    funcState[id]=false;
+    cards.forEach(c=>{if(c.getAttribute('onclick').includes("'"+id+"'"))c.classList.remove('selected')});
+  } else {
+    document.querySelectorAll('.func-detail').forEach(e=>e.classList.remove('open'));
+    Object.keys(funcState).forEach(k=>funcState[k]=false);
+    document.querySelectorAll('.func-card').forEach(c=>c.classList.remove('selected'));
+    el.classList.add('open');
+    funcState[id]=true;
+    cards.forEach(c=>{if(c.getAttribute('onclick').includes("'"+id+"'"))c.classList.add('selected')});
+  }
+}
+
+const funcStateImg = {};
+function showFuncImg(id) {
+  const el = document.getElementById('fdi-'+id);
+  const cards = document.querySelectorAll('#imgFuncGrid .func-card');
+  if(funcStateImg[id]) {
+    el.classList.remove('open');
+    funcStateImg[id]=false;
+    cards.forEach(c=>{if(c.getAttribute('onclick').includes("'"+id+"'"))c.classList.remove('selected')});
+  } else {
+    document.querySelectorAll('.func-detail').forEach(e=>e.classList.remove('open'));
+    Object.keys(funcStateImg).forEach(k=>funcStateImg[k]=false);
+    document.querySelectorAll('.func-card').forEach(c=>c.classList.remove('selected'));
+    el.classList.add('open');
+    funcStateImg[id]=true;
+    cards.forEach(c=>{if(c.getAttribute('onclick').includes("'"+id+"'"))c.classList.add('selected')});
+  }
+}
+
+// ── COMPRESSION SIM (slide 7) ─────────────────────────────────
+function initCompSim() {
+  // Draw a simple test image
+  const size = 200;
+  const origCv = document.getElementById('simOrig');
+  const compCv = document.getElementById('simComp');
+  const diffCv = document.getElementById('simDiff');
+
+  // Generate simple 200×200 image (gradient + circle)
+  const origData = [];
+  for(let r=0;r<size;r++){
+    origData.push([]);
+    for(let c=0;c<size;c++){
+      const dx=c-100, dy=r-100;
+      const circle = dx*dx+dy*dy < 50*50 ? 200 : 0;
+      origData[r].push(Math.min(255,Math.round(r*255/size*0.4 + c*255/size*0.3 + circle*0.3)));
+    }
+  }
+
+  // Draw original
+  const octx = origCv.getContext('2d');
+  const oImg = octx.createImageData(size,size);
+  for(let r=0;r<size;r++) for(let c=0;c<size;c++){
+    const i=(r*size+c)*4, v=origData[r][c];
+    oImg.data[i]=oImg.data[i+1]=oImg.data[i+2]=v; oImg.data[i+3]=255;
+  }
+  octx.putImageData(oImg,0,0);
+
+  function simCompress(qFactor) {
+    const cctx = compCv.getContext('2d');
+    const dctx = diffCv.getContext('2d');
+    const cImg = cctx.createImageData(size,size);
+    const dImg = dctx.createImageData(size,size);
+    let totalZeros=0, mse=0;
+
+    for(let br=0;br<size;br+=8) for(let bc=0;bc<size;bc+=8){
+      const blk = [];
+      for(let r=0;r<8;r++){
+        blk.push([]);
+        for(let c=0;c<8;c++) blk[r].push(origData[Math.min(br+r,size-1)][Math.min(bc+c,size-1)]-128);
+      }
+      const D = dct2(blk);
+      const Dq = D.map((row,ri)=>row.map((v,ci)=>Math.round(v/(Q_JPEG[ri][ci]*qFactor))));
+      totalZeros += Dq.flat().filter(v=>v===0).length;
+      const Dr = Dq.map((row,ri)=>row.map((v,ci)=>v*Q_JPEG[ri][ci]*qFactor));
+      const rec = idct2(Dr).map(row=>row.map(v=>Math.max(0,Math.min(255,v+128))));
+
+      for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+        const pr=(br+r),pc=(bc+c);
+        if(pr>=size||pc>=size) continue;
+        const i=(pr*size+pc)*4;
+        const v=Math.round(rec[r][c]);
+        const orig=origData[pr][pc];
+        mse += Math.pow(orig-v,2);
+        cImg.data[i]=cImg.data[i+1]=cImg.data[i+2]=v; cImg.data[i+3]=255;
+        const diff=Math.min(255,Math.abs(orig-v)*5);
+        dImg.data[i]=diff; dImg.data[i+1]=Math.round(diff*0.3); dImg.data[i+2]=0; dImg.data[i+3]=255;
+      }
+    }
+
+    cctx.putImageData(cImg,0,0);
+    dctx.putImageData(dImg,0,0);
+
+    const pct = (totalZeros/(size*size)*100).toFixed(1);
+    mse /= size*size;
+    const psnr = mse>0 ? (10*Math.log10(255*255/mse)).toFixed(1) : '∞';
+    const rc = (1/(1-totalZeros/(size*size))).toFixed(1);
+    const qual = qFactor<0.6?'Excelente':qFactor<1.2?'Buena':qFactor<2?'Moderada':'Baja';
+
+    document.getElementById('m-zeros').textContent = pct+'%';
+    document.getElementById('m-psnr').textContent = psnr+' dB';
+    document.getElementById('m-rc').textContent = rc+':1';
+    document.getElementById('m-quality').textContent = qual;
+    document.getElementById('m-quality').style.color = qual==='Excelente'?'var(--audio)':qual==='Buena'?'var(--accent)':qual==='Moderada'?'var(--yellow)':'var(--img)';
+    document.getElementById('simLabel').textContent = 'Q×'+qFactor.toFixed(1)+' — '+qual;
+  }
+
+  const sl = document.getElementById('qCompSlider');
+  sl.oninput = () => {
+    const q = parseFloat(sl.value);
+    document.getElementById('qCompVal').textContent = '×'+q.toFixed(1);
+    simCompress(q);
+  };
+  simCompress(1);
+}
+
+// ── INIT ─────────────────────────────────────────────────────
+initHeroWave();
+document.getElementById('progress-bar').style.width = '0%';
+</script>
+</body>
+</html>
